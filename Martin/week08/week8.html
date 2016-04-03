@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>D3 Page Template</title>
+        <script type="text/javascript" src="js/d3.js"></script>
+        <style type="text/css">
+            /* make grid system */
+            .container {
+                width: 920px;
+                padding-right: 15px;
+                padding-left: 15px;
+                margin-right: auto;
+                margin-left: auto;
+            }
+
+            .container:before,
+            .container:after{
+                display: table;
+                content: " ";
+            }
+
+            .btn {
+                background-color: #337ab7;
+                border-color: #2e6da4;
+                color: #fff;
+                display: inline-block;
+                padding: 6px 12px;
+                margin-bottom: 0;
+                font-size: 14px;
+                font-weight: normal;
+                line-height: 1.42857143;
+                text-align: center;
+                white-space: nowrap;
+                vertical-align: middle;
+                -ms-touch-action: manipulation;
+                touch-action: manipulation;
+                cursor: pointer;
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
+                background-image: none;
+                border: 1px solid transparent;
+                border-radius: 4px;
+            }
+            .btn:focus,
+            .btn:active:focus,
+            .btn.active:focus,
+            .btn.focus,
+            .btn:active.focus,
+            .btn.active.focus {
+                outline: thin dotted;
+                outline: 5px auto -webkit-focus-ring-color;
+                outline-offset: -2px;
+            }
+            .btn:hover,
+            .btn:focus,
+            .btn.focus {
+                background-color: #286090;
+                border-color: #122b40;
+                text-decoration: none;
+            }
+            .btn:active,
+            .btn.active {
+                background-color: #286090;
+                border-color: #204d74;
+                background-image: none;
+                outline: 0;
+                -webkit-box-shadow: inset 0 3px 5px rgba(0, 0, 0, .125);
+                box-shadow: inset 0 3px 5px rgba(0, 0, 0, .125);
+            }
+
+            .margin-5 {
+                margin: 5px;
+            }
+
+            .center-text {
+                text-align: center;
+            }
+        </style>
+    </head>
+    <body>
+
+        <div class="container">
+            <div id="buttons" class="center-text margin-5">
+
+            </div>
+            <div id="map-vis">
+
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            var width = 920;
+            var height = 800;
+            var centers = [];
+            var projection;
+            var dataContainer = [];
+            var centerContainer = {};
+            var current;
+
+            //Define map projection
+            projection = d3.geo.mercator()
+                    .scale(250000)
+                    .center([-122.433701, 37.767683])
+                    .translate([width / 2, height / 2]);
+
+            //Define path generator
+            var path = d3.geo.path()
+                    .projection(projection);
+
+            //Create SVG element
+            var svgmap = d3.select("#map-vis")
+                    .append("svg")
+                    .attr("id", "sfmap")
+                    .attr("width", width)
+                    .attr("height", height);
+
+            //Load in GeoJSON data
+            d3.json("sfpddistricts.json", function (json) {
+
+                //Bind data and create one path per GeoJSON feature
+                svgmap.selectAll("path")
+                        .data(json.features)
+                        .enter()
+                        .append("path")
+                        .attr("d", path)
+                        .attr("stroke", "black")
+                        .style("fill", "steelblue");
+            });
+
+            // setup the center markers
+            function setupCenter(data) {
+                var numberOfCenters = data[0].Cluster;
+                for (var i = 0; i < data.length; i++) {
+                    if (!centers[data[i].Label]) {
+                        centers[data[i].Label] = {"Label": data[i].Label, "X": data[i].X, "Y": data[i].Y};
+                        if (numberOfCenters + 1 === Object.keys(centers).length) {
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // setup buttons and events
+            function setupButtons(keys) {
+
+                keys.forEach(function (d) {
+                    d3.select("#buttons")
+                            .data(d)
+                            .append("a")
+                            .attr("class", "btn margin-5")
+                            .html(function (d) {
+                                return "Show for k" + d;
+                            })
+                            .on("click", function (d) {
+                                current = d;
+                                createPoints(d);
+                            })
+                            .on("mouseover", function (d) {
+                                createPoints(d);
+                            })
+                            .on("mouseout", function () {
+                                createPoints(current);
+                            });
+                });
+            }
+
+            // create, update and delete points
+            function createPoints(data) {
+                // create map
+                var svg = d3.select("#sfmap");
+
+                // prepare title
+                var text = svg.selectAll("text")
+                        .data(dataContainer, function(d) {
+                            return d;
+                        });
+
+                // update title
+                text.text("Showing for k" + data);
+
+                // add title
+                text.enter().append("text")
+                        .attr("id", "title")
+                        .attr("x", (width / 2))
+                        .attr("y", 35)
+                        .attr("text-anchor", "middle")
+                        .style("font-size", "30px")
+                        .text("Showing for k" + data);
+                
+                // remove title
+                text.exit().remove();
+
+                // select and update points
+                var points = svg.selectAll(".point")
+                        .data(dataContainer)
+                        .attr("cx", function (d) {
+                            return projection([+d.X, +d.Y])[0];
+                        })
+                        .attr("cy", function (d) {
+                            return projection([+d.X, +d.Y])[1];
+                        })
+                        .style("fill", function (d) {
+                            var label = d.Labels[data];
+                            if (+label === 0)
+                                return "yellow";
+                            if (+label === 1)
+                                return "red";
+                            if (+label === 2)
+                                return "green";
+                            if (+label === 3)
+                                return "purple";
+                            if (+label === 4)
+                                return "hotpink";
+                            if (+label === 5)
+                                return "saddlebrown";
+                        });
+
+                // select and update center points
+                var centerPoints = svg.selectAll(".centers")
+                        .data(centerContainer[data])
+                        .attr("cx", function (d) {
+                            return projection([+d.X, +d.Y])[0];
+                        })
+                        .attr("cy", function (d) {
+                            return projection([+d.X, +d.Y])[1];
+                        })
+                        .style("fill", function (d) {
+                            if (+d.Label === 0)
+                                return "yellow";
+                            if (+d.Label === 1)
+                                return "red";
+                            if (+d.Label === 2)
+                                return "green";
+                            if (+d.Label === 3)
+                                return "purple";
+                            if (+d.Label === 4)
+                                return "hotpink";
+                            if (+d.Label === 5)
+                                return "saddlebrown";
+                        });
+
+                // add points
+                points.enter()
+                        .append("circle")
+                        .attr("class", "point")
+                        .attr("cx", function (d) {
+                            return projection([+d.X, +d.Y])[0];
+                        })
+                        .attr("cy", function (d) {
+                            return projection([+d.X, +d.Y])[1];
+                        })
+                        .attr("r", 5)
+                        .style("fill", function (d) {
+                            var label = d.Labels[data];
+                            if (+label === 0)
+                                return "yellow";
+                            if (+label === 1)
+                                return "red";
+                            if (+label === 2)
+                                return "green";
+                            if (+label === 3)
+                                return "purple";
+                            if (+label === 4)
+                                return "hotpink";
+                            if (+label === 5)
+                                return "saddlebrown";
+                        });
+
+                // update points style
+                points.style("opacity", 0.75);
+
+                // delete points
+                points.exit().remove();
+
+                // add center points
+                centerPoints.enter()
+                        .append("circle")
+                        .attr("class", "centers")
+                        .attr("cx", function (d) {
+                            return projection([+d.X, +d.Y])[0];
+                        })
+                        .attr("cy", function (d) {
+                            return projection([+d.X, +d.Y])[1];
+                        })
+                        .attr("r", 15)
+                        .style("fill", function (d) {
+                            if (+d.Label === 0)
+                                return "yellow";
+                            if (+d.Label === 1)
+                                return "red";
+                            if (+d.Label === 2)
+                                return "green";
+                            if (+d.Label === 3)
+                                return "purple";
+                            if (+d.Label === 4)
+                                return "hotpink";
+                            if (+d.Label === 5)
+                                return "saddlebrown";
+                        });
+
+                // update style on center points
+                centerPoints.style("stroke", "Black")
+                        .style("stroke-width", 2)
+                        .style("opacity", 0.75);
+
+                // remove center points
+                centerPoints.exit().remove();
+            }
+
+            // check for specific label in list
+            function containsLabel(list, label) {
+                for (var i = 0; i < list.length; i++) {
+                    if ("" + list[i]['Label'] === "" + label) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            // setup the data structure
+            function generateData(data) {
+                var tmp = {};
+                for (var i = 0; i < data.length; i++) {
+                    var cluster = data[i]['Clusters'];
+                    var labels = {};
+                    var obj = {};
+                    if (tmp[data[i]['X'] + "," + data[i]['Y']]) {
+                        obj = tmp[data[i]['X'] + "," + data[i]['Y']];
+                        labels = obj['Labels'];
+                        labels[cluster] = data[i]['Label'];
+                    } else {
+                        labels[cluster] = data[i]['Label'];
+                        obj = {"X": data[i]['X'], "Y": data[i]['Y']};
+                    }
+
+                    obj['Labels'] = labels;
+                    tmp[data[i]['X'] + "," + data[i]['Y']] = obj;
+
+                    if (!centerContainer[data[i]['Clusters']] || centerContainer[data[i]['Clusters']].length !== +centerContainer[data[i]['Clusters']]) {
+                        if (centerContainer[data[i]['Clusters']]) {
+                            if (!containsLabel(centerContainer[data[i]['Clusters']], data[i]['Label'])) {
+                                centerContainer[data[i]['Clusters']].push({"Label": data[i].Label, "X": data[i].CenterX, "Y": data[i].CenterY});
+                            }
+                        } else {
+                            centerContainer[data[i]['Clusters']] = [{"Label": data[i].Label, "X": data[i].CenterX, "Y": data[i].CenterY}];
+                        }
+                    }
+                }
+
+                for (var data in tmp) {
+                    dataContainer.push(tmp[data]);
+                }
+
+                setupButtons(Object.keys(centerContainer).sort());
+            }
+
+            d3.csv("Kmeans.csv", function (data) {
+                generateData(data);
+                current = Object.keys(centerContainer).sort()[0];
+                createPoints(current);
+            });
+
+        </script>
+    </body>
+</html>
